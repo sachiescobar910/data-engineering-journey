@@ -96,6 +96,24 @@ Key (patient_id)=(99) is not present in table "patients".
 - Nothing is saved when an insert fails, but the `SERIAL` counter may still advance, so ids can skip numbers.
 - A CSV file or DataFrame would have accepted this row. The database enforces consistency for every program that writes to it.
 
+### The opposite direction: deleting a parent that still has children
+
+```sql
+DELETE FROM patients WHERE id = 2;
+```
+Patient 2 has visits, so PostgreSQL rejects the delete:
+```
+ERROR: update or delete on table "patients" violates foreign key constraint "visits_patient_id_fkey" on table "visits"
+Key (id)=(2) is still referenced from table "visits".
+SQL state: 23503
+```
+- Same constraint name and same SQLSTATE (`23503`) as the patient 99 insert. Referential integrity works in **both** directions: no child without a parent, and no deleting a parent that still has children.
+- The default behavior is to block the delete. Other behavior must be requested when creating the foreign key:
+  - `ON DELETE CASCADE`: deleting the patient also deletes their visits.
+  - `ON DELETE SET NULL`: the visits stay, but `patient_id` is blanked.
+  - `ON DELETE RESTRICT`: block the delete (the default behavior).
+- In healthcare data, `CASCADE` is risky because one delete could erase a whole clinical history. Many systems mark patients inactive instead of deleting them.
+
 ---
 
 ## Common pitfalls (things I actually hit)
